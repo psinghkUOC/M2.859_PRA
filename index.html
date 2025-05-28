@@ -2,12 +2,19 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Visualización VOO - Candlestick</title>
+  <title>VOO Dinámico</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 <body>
-  <h2>VOO ETF - Gráfico de Velas con Indicadores</h2>
+  <h2>VOO ETF - Gráfico de Velas Dinámico</h2>
   <div id="chart" style="width:100%;height:600px;"></div>
+
+  <!-- Gauges -->
+  <div id="gauges" style="display:flex; gap:20px; justify-content:center; margin-top:30px;">
+    <div id="gauge1" style="width:300px;height:250px;"></div>
+    <div id="gauge2" style="width:300px;height:250px;"></div>
+    <div id="gauge3" style="width:300px;height:250px;"></div>
+  </div>
 
   <script>
     async function drawChart() {
@@ -21,56 +28,123 @@
       const high = data.map(r => parseFloat(r[2]));
       const low = data.map(r => parseFloat(r[3]));
       const close = data.map(r => parseFloat(r[4]));
-      const rsi = data.map(r => r[5]);
-      const macd = data.map(r => r[6]);
-      const signal = data.map(r => r[7]);
 
-      const candlestick = {
-        x: times,
-        open: open,
-        high: high,
-        low: low,
-        close: close,
+      let trace = {
+        x: [],
+        open: [],
+        high: [],
+        low: [],
+        close: [],
         type: 'candlestick',
         name: 'VOO',
         increasing: { line: { color: 'green' } },
-        decreasing: { line: { color: 'red' } },
-        xaxis: 'x',
-        yaxis: 'y',
+        decreasing: { line: { color: 'red' } }
       };
 
-      const rsi_trace = {
-        x: times,
-        y: rsi,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'RSI',
-        yaxis: 'y2'
+      let layout = {
+        title: 'Simulación Dinámica VOO',
+        xaxis: { rangeslider: { visible: false } },
+        yaxis: { title: 'Precio' }
       };
 
-      const macd_trace = {
-        x: times,
-        y: macd,
-        type: 'scatter',
-        mode: 'lines',
-        name: 'MACD',
-        yaxis: 'y3'
-      };
+      Plotly.newPlot('chart', [trace], layout);
 
-      const layout = {
-        title: 'VOO - Candlestick con Indicadores',
-        xaxis: { domain: [0, 1], anchor: 'y' },
-        yaxis: { domain: [0.5, 1], title: 'Precio' },
-        yaxis2: { domain: [0.25, 0.5], title: 'RSI', anchor: 'x' },
-        yaxis3: { domain: [0, 0.25], title: 'MACD', anchor: 'x' },
-        height: 800,
-        showlegend: true
-      };
+      let i = 0;
+      const interval = 5000;
 
-      Plotly.newPlot('chart', [candlestick, rsi_trace, macd_trace], layout);
+      function simulateCandle() {
+        if (i >= times.length) return;
+
+        const steps = 20;
+        let step = 0;
+        const currentOpen = open[i];
+        const currentClose = close[i];
+        const delta = (currentClose - currentOpen) / steps;
+
+        const x = times[i];
+        const h = high[i];
+        const l = low[i];
+
+        trace.x.push(x);
+        trace.open.push(currentOpen);
+        trace.high.push(h);
+        trace.low.push(l);
+        trace.close.push(currentOpen);
+
+        function animateStep() {
+          if (step >= steps) return;
+          trace.close[trace.close.length - 1] = currentOpen + delta * step;
+          Plotly.update('chart', { close: [trace.close] });
+          step++;
+          setTimeout(animateStep, interval / steps);
+        }
+
+        Plotly.update('chart', {
+          x: [trace.x],
+          open: [trace.open],
+          high: [trace.high],
+          low: [trace.low],
+          close: [trace.close]
+        });
+
+        animateStep();
+        i++;
+      }
+
+      setInterval(simulateCandle, interval);
     }
 
     drawChart();
+
+    // === GAUGES ===
+    Plotly.newPlot('gauge1', [{
+      type: "indicator",
+      mode: "gauge+number+delta",
+      value: 15,
+      title: { text: "Resumen", font: { size: 18 } },
+      delta: { reference: 10 },
+      gauge: {
+        axis: { range: [0, 30], tickwidth: 1 },
+        bar: { color: "blue" },
+        steps: [
+          { range: [0, 10], color: "pink" },
+          { range: [10, 20], color: "purple" },
+          { range: [20, 30], color: "#cfc" }
+        ]
+      }
+    }], { margin: { t: 50, b: 0 } });
+
+    Plotly.newPlot('gauge2', [{
+      type: "indicator",
+      mode: "gauge+number",
+      value: 10,
+      title: { text: "Osciladores", font: { size: 18 } },
+      gauge: {
+        axis: { range: [0, 30] },
+        bar: { color: "orange" },
+        steps: [
+          { range: [0, 10], color: "#fbb" },
+          { range: [10, 20], color: "#ddd" },
+          { range: [20, 30], color: "#afa" }
+        ]
+      }
+    }]);
+
+    Plotly.newPlot('gauge3', [{
+      type: "indicator",
+      mode: "gauge+number",
+      value: 25,
+      title: { text: "Medias Móviles", font: { size: 18 } },
+      gauge: {
+        axis: { range: [0, 30] },
+        bar: { color: "green" },
+        steps: [
+          { range: [0, 10], color: "#fcc" },
+          { range: [10, 20], color: "#ccc" },
+          { range: [20, 30], color: "#cfc" }
+        ]
+      }
+    }]);
   </script>
 </body>
 </html>
