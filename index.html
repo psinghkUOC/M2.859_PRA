@@ -48,8 +48,8 @@
       transition: background-color 0.3s;
     }
 
-    .button:hover {
-      background-color: #0056b3;
+    .button.active {
+      background-color: #28a745 !important;
     }
 
     #chart {
@@ -86,8 +86,8 @@
 </header>
 
 <div id="controls">
-  <button class="button" onclick="toggleTrace('RSI')">🟠 Alternar RSI</button>
-  <button class="button" onclick="toggleTrace('MACD')">🔵 Alternar MACD</button>
+  <button id="btnRSI" class="button" onclick="toggleTrace('RSI')">🟠 Alternar RSI</button>
+  <button id="btnMACD" class="button" onclick="toggleTrace('MACD')">🔵 Alternar MACD</button>
 </div>
 
 <div id="chart"></div>
@@ -133,6 +133,9 @@
     showlegend: true
   };
 
+  let rsiVisible = false;
+  let macdVisible = false;
+
   async function drawChart() {
     const response = await fetch('ohlc.csv');
     const text = await response.text();
@@ -161,8 +164,10 @@
       trace.high.push(high[i]);
       trace.low.push(low[i]);
       trace.close.push(close[i]);
+
       rsiTrace.x.push(times[i]);
       rsiTrace.y.push(rsi[i]);
+
       macdTrace.x.push(times[i]);
       macdTrace.y.push(macd[i]);
 
@@ -213,10 +218,17 @@
   }
 
   function toggleTrace(name) {
-    const update = { visible: [] };
-    const traces = name === 'RSI' ? [1] : [2];
-    Plotly.restyle('chart', { visible: "legendonly" }, traces);  // Hide first
-    Plotly.restyle('chart', { visible: true }, traces);          // Toggle back on if needed
+    const isRSI = name === 'RSI';
+    const traceIndex = isRSI ? 1 : 2;
+    const current = isRSI ? rsiVisible : macdVisible;
+    const button = document.getElementById(isRSI ? 'btnRSI' : 'btnMACD');
+
+    Plotly.restyle('chart', { visible: current ? false : true }, [traceIndex]);
+
+    if (isRSI) rsiVisible = !rsiVisible;
+    else macdVisible = !macdVisible;
+
+    button.classList.toggle('active');
   }
 
   drawChart();
