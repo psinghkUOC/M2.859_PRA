@@ -13,28 +13,30 @@
     .selector-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
     .selector-box h3 { margin-top: 0; }
     .selector-box label { display: block; margin: 5px 0; cursor: pointer; }
-    #signal-board {
+    .signal-sections { display: flex; justify-content: center; flex-wrap: wrap; margin: 20px auto; gap: 40px; max-width: 1200px; }
+    .signal-section { min-width: 300px; }
+    .signal-board {
       display: flex;
       flex-wrap: wrap;
-      justify-content: center;
-      margin: 30px auto;
+      justify-content: flex-start;
       gap: 15px;
-      max-width: 1200px;
+      margin-top: 10px;
     }
     .signal-card {
-      padding: 15px 20px;
+      padding: 12px 15px;
       border-radius: 8px;
-      color: white;
+      color: black;
       font-weight: bold;
       min-width: 120px;
-      font-size: 16px;
+      font-size: 14px;
+      background: white;
       white-space: pre-line;
+      border: 1px solid #ccc;
     }
-    footer {
-      margin-top: 40px;
-      font-size: 12px;
-      color: gray;
-    }
+    .buy { background: #28a745; color: white; }
+    .sell { background: #dc3545; color: white; }
+    .neutral { background: #6c757d; color: white; }
+    footer { margin-top: 40px; font-size: 12px; color: gray; }
   </style>
 </head>
 <body>
@@ -71,67 +73,70 @@
     </div>
   </div>
 
-  <div id="signal-board"></div>
+  <div class="signal-sections">
+    <div class="signal-section">
+      <h3>Indicadores Corto Plazo</h3>
+      <div id="short-board" class="signal-board"></div>
+    </div>
+    <div class="signal-section">
+      <h3>Indicadores Largo Plazo</h3>
+      <div id="long-board" class="signal-board"></div>
+    </div>
+  </div>
 
   <footer>© 2025 Visualización académica</footer>
 
   <script>
-    let ohlcData = [];
-    let voodata = {};
+    let data = [];
     let currentStep = 0;
+    const shortIndicators = ["RSI_14", "Stochastic_K", "CCI_20", "Momentum_10", "Actual_Price", "Percentage_Up_Value", "Stock_Volume"];
+    const longIndicators = ["ADX_14", "SMA_50", "SMA_200", "EMA_50", "EMA_200", "1Y_Yield", "3Y_Yield", "AUM", "Dividend_Yield"];
 
-    const indicatorHeaders = {};
-
-    function getSelectedIndicators() {
-      return Array.from(document.querySelectorAll('.indicator:checked')).map(cb => cb.value);
+    function getSelectedIndicators(list) {
+      return list.filter(id => document.querySelector(`input[value="${id}"]`)?.checked);
     }
 
-    function colorBySignal(signal) {
-      if (!signal) return '#aaa';
-      const s = signal.toLowerCase();
-      if (s.includes("buy")) return '#28a745';
-      if (s.includes("sell")) return '#dc3545';
-      if (s.includes("neutral")) return '#6c757d';
-      return '#999';
-    }
+    function renderBoard(row) {
+      const shortSelected = getSelectedIndicators(shortIndicators);
+      const longSelected = getSelectedIndicators(longIndicators);
+      const shortContainer = document.getElementById("short-board");
+      const longContainer = document.getElementById("long-board");
+      shortContainer.innerHTML = "";
+      longContainer.innerHTML = "";
 
-    function showSignalBoard(time) {
-      const selected = getSelectedIndicators();
-      const board = document.getElementById('signal-board');
-      board.innerHTML = '';
+      const render = (container, indicators) => {
+        indicators.forEach(ind => {
+          let val = row[ind];
+          const card = document.createElement('div');
+          card.className = 'signal-card';
+          if (typeof val === 'string') {
+            const lval = val.toLowerCase();
+            if (lval.includes("buy")) card.classList.add("buy");
+            else if (lval.includes("sell")) card.classList.add("sell");
+            else if (lval.includes("neutral")) card.classList.add("neutral");
+          }
+          card.innerText = `${ind.replace(/_/g, ' ')}\n${val}`;
+          container.appendChild(card);
+        });
+      };
 
-      const row = voodata[time];
-      if (!row) return;
-
-      selected.forEach(ind => {
-        if (row[ind]) {
-          const div = document.createElement('div');
-          div.className = 'signal-card';
-          div.style.background = colorBySignal(row[ind]);
-          div.innerText = `${ind.replace(/_/g, ' ')}\n${row[ind]}`;
-          board.appendChild(div);
-        }
-      });
+      render(shortContainer, shortSelected);
+      render(longContainer, longSelected);
     }
 
     function updateChart(step) {
-      const datetime = [], open = [], high = [], low = [], close = [];
-
+      const time = [], price = [];
       for (let i = 0; i <= step; i++) {
-        const row = ohlcData[i];
-        datetime.push(row.Time);
-        open.push(+row.open);
-        high.push(+row.high);
-        low.push(+row.low);
-        close.push(+row.close);
+        time.push(data[i].Time);
+        price.push(parseFloat(data[i].Actual_Price));
       }
 
       const trace = {
-        x: datetime,
-        open: open,
-        high: high,
-        low: low,
-        close: close,
+        x: time,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
         type: 'candlestick',
         name: 'Precio VOO',
         increasing: { line: { color: 'green' } },
@@ -145,57 +150,41 @@
       };
 
       Plotly.newPlot('chart', [trace], layout);
-
-      const currentTime = ohlcData[step].Time;
-      showSignalBoard(currentTime);
+      renderBoard(data[step]);
     }
 
     function simulate() {
-      function stepForward() {
-        if (currentStep >= ohlcData.length) return;
+      function step() {
+        if (currentStep >= data.length) return;
         updateChart(currentStep);
         currentStep++;
-        setTimeout(stepForward, 500);
+        setTimeout(step, 500);
       }
-      stepForward();
+      step();
     }
 
-    function loadFiles() {
-      Promise.all([
-        fetch('ohlc.csv').then(res => res.text()),
-        fetch('ETF_VOO_DATA.csv').then(res => res.text())
-      ]).then(([ohlcText, vooText]) => {
-        const ohlcRows = ohlcText.trim().split('\n');
-        const ohlcHeaders = ohlcRows[0].split(',');
-        ohlcData = ohlcRows.slice(1).map(row => {
-          const values = row.split(',');
+    fetch('ETF_VOO_DATA.csv')
+      .then(response => response.text())
+      .then(text => {
+        const rows = text.trim().split('\n');
+        const headers = rows[0].split(';');
+        data = rows.slice(1).map(line => {
+          const values = line.split(';');
           const obj = {};
-          ohlcHeaders.forEach((h, i) => obj[h] = values[i]);
+          headers.forEach((h, i) => obj[h] = values[i]);
           return obj;
         });
 
-        const vooRows = vooText.trim().split('\n');
-        const vooHeaders = vooRows[0].split(';');
-        vooRows.slice(1).forEach(row => {
-          const values = row.split(';');
-          const time = values[vooHeaders.indexOf('Time')];
-          voodata[time] = {};
-          vooHeaders.forEach((h, i) => voodata[time][h] = values[i]);
+        document.querySelectorAll('.indicator').forEach(cb => {
+          cb.addEventListener('change', () => {
+            if (currentStep > 0 && currentStep < data.length) {
+              renderBoard(data[currentStep - 1]);
+            }
+          });
         });
 
         simulate();
       });
-    }
-
-    loadFiles();
-
-    document.querySelectorAll('.indicator').forEach(cb => {
-      cb.addEventListener('change', () => {
-        if (currentStep > 0 && currentStep < ohlcData.length) {
-          showSignalBoard(ohlcData[currentStep - 1].Time);
-        }
-      });
-    });
   </script>
 </body>
 </html>
