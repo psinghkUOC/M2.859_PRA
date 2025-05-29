@@ -5,10 +5,14 @@
   <title>Simulación ETF VOO</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
-    body { font-family: Arial; background: #f2f2f2; margin: 0; text-align: center; }
+    body { font-family: Arial, sans-serif; background: #f2f2f2; margin: 0; text-align: center; }
     header { background: #800000; color: white; padding: 15px 0; }
     .chart-container { width: 100%; max-width: 1200px; margin: auto; }
     #chart { height: 600px; }
+    .selectors { display: flex; justify-content: center; flex-wrap: wrap; gap: 40px; margin-top: 20px; }
+    .selector-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .selector-box h3 { margin-top: 0; }
+    .selector-box label { display: block; margin: 5px 0; cursor: pointer; }
     #signal-board {
       display: flex;
       flex-wrap: wrap;
@@ -42,44 +46,69 @@
     <div id="chart"></div>
   </div>
 
+  <div class="selectors">
+    <div class="selector-box">
+      <h3>Corto Plazo</h3>
+      <label><input type="checkbox" class="indicator" value="RSI_14" checked> RSI 14</label>
+      <label><input type="checkbox" class="indicator" value="Stochastic_K" checked> Stochastic K</label>
+      <label><input type="checkbox" class="indicator" value="CCI_20" checked> CCI 20</label>
+      <label><input type="checkbox" class="indicator" value="Momentum_10" checked> Momentum 10</label>
+      <label><input type="checkbox" class="indicator" value="Actual_Price" checked> Actual Price</label>
+      <label><input type="checkbox" class="indicator" value="Percentage_Up_Value" checked> % Up Value</label>
+      <label><input type="checkbox" class="indicator" value="Stock_Volume" checked> Stock Volume</label>
+    </div>
+    <div class="selector-box">
+      <h3>Largo Plazo</h3>
+      <label><input type="checkbox" class="indicator" value="ADX_14" checked> ADX 14</label>
+      <label><input type="checkbox" class="indicator" value="SMA_50" checked> SMA 50</label>
+      <label><input type="checkbox" class="indicator" value="SMA_200" checked> SMA 200</label>
+      <label><input type="checkbox" class="indicator" value="EMA_50" checked> EMA 50</label>
+      <label><input type="checkbox" class="indicator" value="EMA_200" checked> EMA 200</label>
+      <label><input type="checkbox" class="indicator" value="1Y_Yield" checked> 1Y Yield</label>
+      <label><input type="checkbox" class="indicator" value="3Y_Yield" checked> 3Y Yield</label>
+      <label><input type="checkbox" class="indicator" value="AUM" checked> AUM</label>
+      <label><input type="checkbox" class="indicator" value="Dividend_Yield" checked> Dividend Yield</label>
+    </div>
+  </div>
+
   <div id="signal-board"></div>
 
   <footer>© 2025 Visualización académica</footer>
 
   <script>
-    const signalIndicators = [
-      'RSI_14', 'MACD_12_26_9', 'EMA_10', 'EMA_50', 'EMA_200',
-      'SMA_10', 'SMA_50', 'SMA_200', 'VWMA_20',
-      'ADX_14', 'CCI_20', 'Momentum_10', 'Ultimate_Oscillator',
-      'Ichimoku_Base', 'Stochastic_K'
-    ];
-
-    const indicatorHeaders = {};
     let ohlcData = [];
+    let voodata = {};
     let currentStep = 0;
 
-    function colorBySignal(signal) {
-      switch (signal) {
-        case 'Buy': return '#28a745';     // Verde
-        case 'Sell': return '#dc3545';    // Rojo
-        case 'Neutral': return '#6c757d'; // Gris
-        default: return '#999999';        // Desconocido
-      }
+    const indicatorHeaders = {};
+
+    function getSelectedIndicators() {
+      return Array.from(document.querySelectorAll('.indicator:checked')).map(cb => cb.value);
     }
 
-    function showSignalBoard(row) {
+    function colorBySignal(signal) {
+      if (!signal) return '#aaa';
+      const s = signal.toLowerCase();
+      if (s.includes("buy")) return '#28a745';
+      if (s.includes("sell")) return '#dc3545';
+      if (s.includes("neutral")) return '#6c757d';
+      return '#999';
+    }
+
+    function showSignalBoard(time) {
+      const selected = getSelectedIndicators();
       const board = document.getElementById('signal-board');
       board.innerHTML = '';
 
-      signalIndicators.forEach(ind => {
-        const i = indicatorHeaders[ind];
-        if (i !== undefined && row[i]) {
-          const signal = row[i];
-          const color = colorBySignal(signal);
+      const row = voodata[time];
+      if (!row) return;
+
+      selected.forEach(ind => {
+        if (row[ind]) {
           const div = document.createElement('div');
           div.className = 'signal-card';
-          div.style.background = color;
-          div.innerText = `${ind.replace(/_/g, ' ')}\n${signal}`;
+          div.style.background = colorBySignal(row[ind]);
+          div.innerText = `${ind.replace(/_/g, ' ')}\n${row[ind]}`;
           board.appendChild(div);
         }
       });
@@ -87,13 +116,14 @@
 
     function updateChart(step) {
       const datetime = [], open = [], high = [], low = [], close = [];
+
       for (let i = 0; i <= step; i++) {
         const row = ohlcData[i];
-        datetime.push(row[0]);
-        open.push(+row[1]);
-        high.push(+row[2]);
-        low.push(+row[3]);
-        close.push(+row[4]);
+        datetime.push(row.Time);
+        open.push(+row.open);
+        high.push(+row.high);
+        low.push(+row.low);
+        close.push(+row.close);
       }
 
       const trace = {
@@ -109,39 +139,63 @@
       };
 
       const layout = {
-        title: 'Precio del ETF VOO',
+        title: 'Simulación Progresiva del ETF VOO',
         xaxis: { title: 'Tiempo', rangeslider: { visible: false } },
-        yaxis: { title: 'Precio' },
-        margin: { t: 40 }
+        yaxis: { title: 'Precio' }
       };
 
       Plotly.newPlot('chart', [trace], layout);
+
+      const currentTime = ohlcData[step].Time;
+      showSignalBoard(currentTime);
     }
-
-    fetch('ohlc.csv')
-      .then(response => response.text())
-      .then(text => {
-        const rows = text.trim().split('\n');
-        const headers = rows[0].split(',');
-        ohlcData = rows.slice(1).map(r => r.split(','));
-
-        signalIndicators.forEach(ind => {
-          indicatorHeaders[ind] = headers.indexOf(ind);
-        });
-
-        simulate();
-      });
 
     function simulate() {
       function stepForward() {
         if (currentStep >= ohlcData.length) return;
         updateChart(currentStep);
-        showSignalBoard(ohlcData[currentStep]);
         currentStep++;
-        setTimeout(stepForward, 400);
+        setTimeout(stepForward, 500);
       }
       stepForward();
     }
+
+    function loadFiles() {
+      Promise.all([
+        fetch('ohlc.csv').then(res => res.text()),
+        fetch('ETF_VOO_DATA.csv').then(res => res.text())
+      ]).then(([ohlcText, vooText]) => {
+        const ohlcRows = ohlcText.trim().split('\n');
+        const ohlcHeaders = ohlcRows[0].split(',');
+        ohlcData = ohlcRows.slice(1).map(row => {
+          const values = row.split(',');
+          const obj = {};
+          ohlcHeaders.forEach((h, i) => obj[h] = values[i]);
+          return obj;
+        });
+
+        const vooRows = vooText.trim().split('\n');
+        const vooHeaders = vooRows[0].split(';');
+        vooRows.slice(1).forEach(row => {
+          const values = row.split(';');
+          const time = values[vooHeaders.indexOf('Time')];
+          voodata[time] = {};
+          vooHeaders.forEach((h, i) => voodata[time][h] = values[i]);
+        });
+
+        simulate();
+      });
+    }
+
+    loadFiles();
+
+    document.querySelectorAll('.indicator').forEach(cb => {
+      cb.addEventListener('change', () => {
+        if (currentStep > 0 && currentStep < ohlcData.length) {
+          showSignalBoard(ohlcData[currentStep - 1].Time);
+        }
+      });
+    });
   </script>
 </body>
 </html>
