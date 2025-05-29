@@ -5,23 +5,32 @@
   <title>Simulación ETF VOO</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
-    body { font-family: Arial; text-align: center; background: #f2f2f2; margin: 0; }
-    header { background: #800000; color: white; padding: 10px 0; }
-    .btn-container { margin-top: 10px; }
-    .toggle-btn {
-      margin: 5px;
-      padding: 8px 12px;
-      background: #2d66f7;
+    body { font-family: Arial; background: #f2f2f2; margin: 0; text-align: center; }
+    header { background: #800000; color: white; padding: 15px 0; }
+    .chart-container { width: 100%; max-width: 1200px; margin: auto; }
+    #chart { height: 600px; }
+    #signal-board {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 30px auto;
+      gap: 15px;
+      max-width: 1200px;
+    }
+    .signal-card {
+      padding: 15px 20px;
+      border-radius: 8px;
       color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: background 0.3s;
+      font-weight: bold;
+      min-width: 120px;
+      font-size: 16px;
+      white-space: pre-line;
     }
-    .toggle-btn.active {
-      background: #28a745; /* verde */
+    footer {
+      margin-top: 40px;
+      font-size: 12px;
+      color: gray;
     }
-    footer { margin-top: 30px; font-size: 12px; color: gray; }
   </style>
 </head>
 <body>
@@ -29,43 +38,55 @@
     <h1>Simulación Dinámica ETF VOO</h1>
   </header>
 
-  <div id="chart" style="width: 100%; height: 600px;"></div>
+  <div class="chart-container">
+    <div id="chart"></div>
+  </div>
 
-  <div class="btn-container" id="indicator-buttons"></div>
+  <div id="signal-board"></div>
 
   <footer>© 2025 Visualización académica</footer>
 
   <script>
-    const indicadores = ['RSI_14', 'MACD_12_26_9', 'ADX_14', 'CCI_20', 'Momentum_10', 'Stochastic_K', 'Ultimate_Oscillator'];
-    const indicatorStates = {};
-    const indicatorButtons = {};
+    const signalIndicators = [
+      'RSI_14', 'MACD_12_26_9', 'EMA_10', 'EMA_50', 'EMA_200',
+      'SMA_10', 'SMA_50', 'SMA_200', 'VWMA_20',
+      'ADX_14', 'CCI_20', 'Momentum_10', 'Ultimate_Oscillator',
+      'Ichimoku_Base', 'Stochastic_K'
+    ];
 
+    const indicatorHeaders = {};
     let ohlcData = [];
     let currentStep = 0;
-    const indicatorHeaders = {};
 
-    function crearBotones() {
-      const container = document.getElementById('indicator-buttons');
-      indicadores.forEach(ind => {
-        const btn = document.createElement('button');
-        btn.className = 'toggle-btn';
-        btn.innerText = `Alternar ${ind.replace(/_/g, ' ')}`;
-        btn.onclick = () => toggleIndicator(ind, btn);
-        container.appendChild(btn);
-        indicatorStates[ind] = false;
-        indicatorButtons[ind] = btn;
-      });
+    function colorBySignal(signal) {
+      switch (signal) {
+        case 'Buy': return '#28a745';     // Verde
+        case 'Sell': return '#dc3545';    // Rojo
+        case 'Neutral': return '#6c757d'; // Gris
+        default: return '#999999';        // Desconocido
+      }
     }
 
-    function toggleIndicator(ind, button) {
-      indicatorStates[ind] = !indicatorStates[ind];
-      button.classList.toggle('active', indicatorStates[ind]);
-      updateChart(currentStep);
+    function showSignalBoard(row) {
+      const board = document.getElementById('signal-board');
+      board.innerHTML = '';
+
+      signalIndicators.forEach(ind => {
+        const i = indicatorHeaders[ind];
+        if (i !== undefined && row[i]) {
+          const signal = row[i];
+          const color = colorBySignal(signal);
+          const div = document.createElement('div');
+          div.className = 'signal-card';
+          div.style.background = color;
+          div.innerText = `${ind.replace(/_/g, ' ')}\n${signal}`;
+          board.appendChild(div);
+        }
+      });
     }
 
     function updateChart(step) {
       const datetime = [], open = [], high = [], low = [], close = [];
-
       for (let i = 0; i <= step; i++) {
         const row = ohlcData[i];
         datetime.push(row[0]);
@@ -75,7 +96,7 @@
         close.push(+row[4]);
       }
 
-      const traces = [{
+      const trace = {
         x: datetime,
         open: open,
         high: high,
@@ -85,42 +106,16 @@
         name: 'Precio VOO',
         increasing: { line: { color: 'green' } },
         decreasing: { line: { color: 'red' } }
-      }];
-
-      indicadores.forEach(ind => {
-        if (indicatorStates[ind]) {
-          const y = [];
-          for (let i = 0; i <= step; i++) {
-            const val = ohlcData[i][indicatorHeaders[ind]];
-            y.push(val === "" ? null : parseFloat(val));
-          }
-          traces.push({
-            x: datetime,
-            y: y,
-            type: 'scatter',
-            mode: 'lines',
-            name: ind.replace(/_/g, ' '),
-            yaxis: 'y2',
-            line: { width: 2 },
-            hoverinfo: 'x+y+name'
-          });
-        }
-      });
-
-      const layout = {
-        title: 'Simulación ETF VOO',
-        xaxis: { title: 'Tiempo', rangeslider: { visible: false } },
-        yaxis: { title: 'Precio' },
-        yaxis2: {
-          title: 'Indicadores',
-          overlaying: 'y',
-          side: 'right',
-          showgrid: false
-        },
-        legend: { orientation: 'h', y: -0.2 }
       };
 
-      Plotly.newPlot('chart', traces, layout);
+      const layout = {
+        title: 'Precio del ETF VOO',
+        xaxis: { title: 'Tiempo', rangeslider: { visible: false } },
+        yaxis: { title: 'Precio' },
+        margin: { t: 40 }
+      };
+
+      Plotly.newPlot('chart', [trace], layout);
     }
 
     fetch('ohlc.csv')
@@ -130,20 +125,20 @@
         const headers = rows[0].split(',');
         ohlcData = rows.slice(1).map(r => r.split(','));
 
-        indicadores.forEach(ind => {
+        signalIndicators.forEach(ind => {
           indicatorHeaders[ind] = headers.indexOf(ind);
         });
 
-        crearBotones();
-        simulateChart();
+        simulate();
       });
 
-    function simulateChart() {
+    function simulate() {
       function stepForward() {
         if (currentStep >= ohlcData.length) return;
         updateChart(currentStep);
+        showSignalBoard(ohlcData[currentStep]);
         currentStep++;
-        setTimeout(stepForward, 400); // 400 ms entre velas
+        setTimeout(stepForward, 400);
       }
       stepForward();
     }
