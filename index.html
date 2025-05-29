@@ -9,6 +9,16 @@
     header { background: #800000; color: white; padding: 15px 0; }
     .chart-container { width: 100%; max-width: 1200px; margin: auto; }
     #chart { height: 600px; }
+    #toggle-btn {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #333;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
     .selectors { display: flex; justify-content: center; flex-wrap: wrap; gap: 40px; margin-top: 20px; }
     .selector-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
     .selector-box h3 { margin-top: 0; }
@@ -46,6 +56,7 @@
 
   <div class="chart-container">
     <div id="chart"></div>
+    <button id="toggle-btn">⏸ Pausar simulación</button>
   </div>
 
   <div class="selectors">
@@ -89,8 +100,15 @@
   <script>
     let data = [];
     let currentStep = 0;
+    let isPaused = false;
+
     const shortIndicators = ["RSI_14", "Stochastic_K", "CCI_20", "Momentum_10", "Actual_Price", "Percentage_Up_Value", "Stock_Volume"];
     const longIndicators = ["ADX_14", "SMA_50", "SMA_200", "EMA_50", "EMA_200", "1Y_Yield", "3Y_Yield", "AUM", "Dividend_Yield"];
+
+    document.getElementById('toggle-btn').addEventListener('click', () => {
+      isPaused = !isPaused;
+      document.getElementById('toggle-btn').innerText = isPaused ? '▶ Reanudar simulación' : '⏸ Pausar simulación';
+    });
 
     function getSelectedIndicators(list) {
       return list.filter(id => document.querySelector(`input[value="${id}"]`)?.checked);
@@ -156,9 +174,11 @@
     function simulate() {
       function step() {
         if (currentStep >= data.length) return;
-        updateChart(currentStep);
-        currentStep++;
-        setTimeout(step, 500);
+        if (!isPaused) {
+          updateChart(currentStep);
+          currentStep++;
+        }
+        setTimeout(step, 1000); // ← velocidad lenta: 1 segundo
       }
       step();
     }
